@@ -4,114 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Enhanced Chat Test</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }
-    #chat-status {
-      margin-top: 1.5rem;
-      padding: 1rem 1.25rem;
-      border-radius: 8px;
-      max-width: 52rem;
-      white-space: pre-wrap;
-    }
-    #chat-status.pending { background: #fff8e1; border: 1px solid #f9a825; }
-    #chat-status.ok { background: #e8f5e9; border: 1px solid #2e7d32; }
-    #chat-status.error { background: #fdecea; border: 1px solid #c62828; }
-  </style>
 </head>
 <body>
   <h1>Prueba Enhanced Chat</h1>
   <p>Si todo está bien configurado, verás el botón de chat en la esquina inferior.</p>
-  <div id="chat-status" class="pending">Cargando widget de Salesforce…</div>
 
-  <script type="text/javascript">
-    var SITE_BASE = 'https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677';
-    var BOOTSTRAP_WITH_S = SITE_BASE + '/s/assets/js/bootstrap.min.js';
-    var BOOTSTRAP_WITHOUT_S = SITE_BASE + '/assets/js/bootstrap.min.js';
-    var BOOTSTRAP_URL = BOOTSTRAP_WITH_S;
-
-    function setChatStatus(type, message) {
-      var box = document.getElementById('chat-status');
-      box.className = type;
-      box.textContent = message;
-    }
-
-    function previewBody(text) {
-      return (text || '').replace(/\s+/g, ' ').slice(0, 220);
-    }
-
-    function inspectUrl(url) {
-      return fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' })
-        .then(function (res) {
-          return res.text().then(function (text) {
-            var looksHtml = /^\s*</.test(text);
-            var looksJs = text.indexOf('embeddedservice_bootstrap') !== -1;
-            return [
-              url,
-              '  HTTP ' + res.status + ' ' + res.statusText,
-              '  content-type: ' + (res.headers.get('content-type') || '(no visible)'),
-              '  ¿HTML?: ' + looksHtml + '  ¿JS del chat?: ' + looksJs,
-              '  Inicio: ' + (previewBody(text) || '(vacío)')
-            ].join('\n');
-          });
-        })
-        .catch(function (err) {
-          return url + '\n  Fetch bloqueado (CORS/red): ' + err;
-        });
-    }
-
-    function explainMissingBootstrap() {
-      return Promise.all([inspectUrl(BOOTSTRAP_WITH_S), inspectUrl(BOOTSTRAP_WITHOUT_S)])
-        .then(function (reports) {
-          var msg =
-            'El navegador pidió bootstrap.min.js, pero no existe embeddedservice_bootstrap.\n' +
-            'Eso significa que Salesforce no está sirviendo el JS del widget (suele devolver HTML de login, 409 o 401).\n\n' +
-            'Origen: ' + window.location.origin + '\n\n' +
-            reports.join('\n\n') + '\n\n' +
-            'En la org UAT hay que dejar público el site Experience Cloud (guest), publicar el deployment y autorizar https://sfigueroa12.github.io.';
-          console.error(msg);
-          setChatStatus('error', msg);
-        });
-    }
-
+  <script type='text/javascript'>
     function initEmbeddedMessaging() {
       try {
-        if (typeof embeddedservice_bootstrap === 'undefined') {
-          setChatStatus('error', 'Salesforce no expuso embeddedservice_bootstrap. Inspeccionando la respuesta…');
-          explainMissingBootstrap();
-          return;
-        }
-
-        embeddedservice_bootstrap.settings.language = 'es';
-
+        embeddedservice_bootstrap.settings.language = 'es'; // For example, enter 'en' or 'en-US'
+  
         embeddedservice_bootstrap.init(
-          '00D3O0000008mtk',
+          '00Dba000002x8Ob',
           'FB_chn_Web_Publica_SAC',
-          SITE_BASE + '/s',
+          'https://polaris1--devsac.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677',
           {
-            scrt2URL: 'https://cepsa--uat.sandbox.my.salesforce-scrt.com'
+            scrt2URL: 'https://polaris1--devsac.sandbox.my.salesforce-scrt.com'
           }
-        );
-
-        setChatStatus(
-          'ok',
-          'Init ejecutado desde ' + window.location.origin + '.\n' +
-          'Si no ves el botón flotante, este dominio no está en Allowed Domains / CORS de la org UAT.\n' +
-          'Añade exactamente: https://sfigueroa12.github.io'
         );
       } catch (err) {
         console.error('Error loading Embedded Messaging: ', err);
-        setChatStatus('error', 'Error al inicializar Embedded Messaging:\n' + err);
       }
-    }
-
-    function onBootstrapLoadError() {
-      setChatStatus('error', 'El <script> de Salesforce falló. Inspeccionando la respuesta…');
-      explainMissingBootstrap();
-    }
+    };
   </script>
-  <script type="text/javascript"
-    src="https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677/s/assets/js/bootstrap.min.js"
-    onload="initEmbeddedMessaging()"
-    onerror="onBootstrapLoadError()"></script>
+  <script type='text/javascript' src='https://polaris1--devsac.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>  
+
 </body>
 </html>
