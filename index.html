@@ -16,7 +16,6 @@
     #chat-status.pending { background: #fff8e1; border: 1px solid #f9a825; }
     #chat-status.ok { background: #e8f5e9; border: 1px solid #2e7d32; }
     #chat-status.error { background: #fdecea; border: 1px solid #c62828; }
-    ol { max-width: 52rem; }
   </style>
 </head>
 <body>
@@ -25,7 +24,10 @@
   <div id="chat-status" class="pending">Cargando widget de Salesforce…</div>
 
   <script type="text/javascript">
-    var BOOTSTRAP_URL = 'https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677/s/assets/js/bootstrap.min.js';
+    var SITE_BASE = 'https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677';
+    var BOOTSTRAP_WITH_S = SITE_BASE + '/s/assets/js/bootstrap.min.js';
+    var BOOTSTRAP_WITHOUT_S = SITE_BASE + '/assets/js/bootstrap.min.js';
+    var BOOTSTRAP_URL = BOOTSTRAP_WITH_S;
 
     function setChatStatus(type, message) {
       var box = document.getElementById('chat-status');
@@ -33,13 +35,49 @@
       box.textContent = message;
     }
 
+    function previewBody(text) {
+      return (text || '').replace(/\s+/g, ' ').slice(0, 220);
+    }
+
+    function inspectUrl(url) {
+      return fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' })
+        .then(function (res) {
+          return res.text().then(function (text) {
+            var looksHtml = /^\s*</.test(text);
+            var looksJs = text.indexOf('embeddedservice_bootstrap') !== -1;
+            return [
+              url,
+              '  HTTP ' + res.status + ' ' + res.statusText,
+              '  content-type: ' + (res.headers.get('content-type') || '(no visible)'),
+              '  ¿HTML?: ' + looksHtml + '  ¿JS del chat?: ' + looksJs,
+              '  Inicio: ' + (previewBody(text) || '(vacío)')
+            ].join('\n');
+          });
+        })
+        .catch(function (err) {
+          return url + '\n  Fetch bloqueado (CORS/red): ' + err;
+        });
+    }
+
+    function explainMissingBootstrap() {
+      return Promise.all([inspectUrl(BOOTSTRAP_WITH_S), inspectUrl(BOOTSTRAP_WITHOUT_S)])
+        .then(function (reports) {
+          var msg =
+            'El navegador pidió bootstrap.min.js, pero no existe embeddedservice_bootstrap.\n' +
+            'Eso significa que Salesforce no está sirviendo el JS del widget (suele devolver HTML de login, 409 o 401).\n\n' +
+            'Origen: ' + window.location.origin + '\n\n' +
+            reports.join('\n\n') + '\n\n' +
+            'En la org UAT hay que dejar público el site Experience Cloud (guest), publicar el deployment y autorizar https://sfigueroa12.github.io.';
+          console.error(msg);
+          setChatStatus('error', msg);
+        });
+    }
+
     function initEmbeddedMessaging() {
       try {
         if (typeof embeddedservice_bootstrap === 'undefined') {
-          var msg = 'El archivo bootstrap.min.js se pidió, pero Salesforce no expuso embeddedservice_bootstrap.\n' +
-            'Suele ocurrir si el site Experience Cloud no es público o si este dominio no está autorizado.';
-          console.error(msg);
-          setChatStatus('error', msg);
+          setChatStatus('error', 'Salesforce no expuso embeddedservice_bootstrap. Inspeccionando la respuesta…');
+          explainMissingBootstrap();
           return;
         }
 
@@ -48,7 +86,7 @@
         embeddedservice_bootstrap.init(
           '00D3O0000008mtk',
           'FB_chn_Web_Publica_SAC',
-          'https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677/s',
+          SITE_BASE + '/s',
           {
             scrt2URL: 'https://cepsa--uat.sandbox.my.salesforce-scrt.com'
           }
@@ -67,49 +105,8 @@
     }
 
     function onBootstrapLoadError() {
-      console.error('Fallo al cargar bootstrap.min.js', {
-        origin: window.location.origin,
-        url: BOOTSTRAP_URL
-      });
-
-      setChatStatus(
-        'error',
-        'El <script> de Salesforce falló. Consultando el motivo…\n' +
-        'Origen: ' + window.location.origin
-      );
-
-      fetch(BOOTSTRAP_URL, { method: 'GET', mode: 'cors', cache: 'no-store' })
-        .then(function (res) {
-          var detail =
-            'El <script> falló. El fetch posterior recibió:\n' +
-            'HTTP ' + res.status + ' ' + res.statusText + '\n' +
-            'content-type: ' + (res.headers.get('content-type') || '(no visible)') + '\n\n' +
-            'Origen: ' + window.location.origin + '\n' +
-            'URL: ' + BOOTSTRAP_URL + '\n\n' +
-            (res.status === 409
-              ? '409 Conflict: el site Experience Cloud UAT está rechazando la petición (site no público, guest sin acceso, o dominio no autorizado).'
-              : res.status === 403
-                ? '403: Salesforce deniega el acceso a este origen.'
-                : res.status >= 400
-                  ? 'El site UAT no está entregando el JS del chat a GitHub Pages.'
-                  : 'HTTP aparentemente OK en fetch, pero el <script> no se ejecutó. Prueba sin bloqueador de anuncios y recarga.');
-          console.error(detail);
-          setChatStatus('error', detail);
-        })
-        .catch(function (err) {
-          var detail =
-            'El <script> falló y el navegador también bloqueó el fetch (típico de CORS).\n' +
-            String(err) + '\n\n' +
-            'Origen: ' + window.location.origin + '\n' +
-            'URL: ' + BOOTSTRAP_URL + '\n\n' +
-            'Salesforce UAT no está permitiendo este dominio. En F12 no verás nada útil si:\n' +
-            '- Abres F12 en Cursor en lugar de en Chrome/Edge sobre github.io\n' +
-            '- En Red el filtro no está en "Todo" (All)\n' +
-            '- No recargas la página CON F12 ya abierto\n\n' +
-            'Hay que autorizar https://sfigueroa12.github.io en Allowed Domains del deployment y en CORS de la org.';
-          console.error(detail);
-          setChatStatus('error', detail);
-        });
+      setChatStatus('error', 'El <script> de Salesforce falló. Inspeccionando la respuesta…');
+      explainMissingBootstrap();
     }
   </script>
   <script type="text/javascript"
