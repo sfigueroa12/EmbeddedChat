@@ -16,6 +16,7 @@
     #chat-status.pending { background: #fff8e1; border: 1px solid #f9a825; }
     #chat-status.ok { background: #e8f5e9; border: 1px solid #2e7d32; }
     #chat-status.error { background: #fdecea; border: 1px solid #c62828; }
+    ol { max-width: 52rem; }
   </style>
 </head>
 <body>
@@ -24,6 +25,8 @@
   <div id="chat-status" class="pending">Cargando widget de Salesforce…</div>
 
   <script type="text/javascript">
+    var BOOTSTRAP_URL = 'https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677/s/assets/js/bootstrap.min.js';
+
     function setChatStatus(type, message) {
       var box = document.getElementById('chat-status');
       box.className = type;
@@ -33,11 +36,10 @@
     function initEmbeddedMessaging() {
       try {
         if (typeof embeddedservice_bootstrap === 'undefined') {
-          setChatStatus(
-            'error',
-            'El archivo bootstrap.min.js se pidió, pero Salesforce no expuso embeddedservice_bootstrap.\n' +
-            'Suele ocurrir si el site Experience Cloud no es público o si este dominio no está autorizado.'
-          );
+          var msg = 'El archivo bootstrap.min.js se pidió, pero Salesforce no expuso embeddedservice_bootstrap.\n' +
+            'Suele ocurrir si el site Experience Cloud no es público o si este dominio no está autorizado.';
+          console.error(msg);
+          setChatStatus('error', msg);
           return;
         }
 
@@ -65,13 +67,49 @@
     }
 
     function onBootstrapLoadError() {
+      console.error('Fallo al cargar bootstrap.min.js', {
+        origin: window.location.origin,
+        url: BOOTSTRAP_URL
+      });
+
       setChatStatus(
         'error',
-        'No se pudo cargar bootstrap.min.js desde el site UAT de Cepsa.\n' +
-        'Origen de esta página: ' + window.location.origin + '\n\n' +
-        'Revisa en F12 > Red si bootstrap.min.js da 409, 403 o CORS.\n' +
-        'Hay que autorizar https://sfigueroa12.github.io en el Embedded Service Deployment y en CORS de la org.'
+        'El <script> de Salesforce falló. Consultando el motivo…\n' +
+        'Origen: ' + window.location.origin
       );
+
+      fetch(BOOTSTRAP_URL, { method: 'GET', mode: 'cors', cache: 'no-store' })
+        .then(function (res) {
+          var detail =
+            'El <script> falló. El fetch posterior recibió:\n' +
+            'HTTP ' + res.status + ' ' + res.statusText + '\n' +
+            'content-type: ' + (res.headers.get('content-type') || '(no visible)') + '\n\n' +
+            'Origen: ' + window.location.origin + '\n' +
+            'URL: ' + BOOTSTRAP_URL + '\n\n' +
+            (res.status === 409
+              ? '409 Conflict: el site Experience Cloud UAT está rechazando la petición (site no público, guest sin acceso, o dominio no autorizado).'
+              : res.status === 403
+                ? '403: Salesforce deniega el acceso a este origen.'
+                : res.status >= 400
+                  ? 'El site UAT no está entregando el JS del chat a GitHub Pages.'
+                  : 'HTTP aparentemente OK en fetch, pero el <script> no se ejecutó. Prueba sin bloqueador de anuncios y recarga.');
+          console.error(detail);
+          setChatStatus('error', detail);
+        })
+        .catch(function (err) {
+          var detail =
+            'El <script> falló y el navegador también bloqueó el fetch (típico de CORS).\n' +
+            String(err) + '\n\n' +
+            'Origen: ' + window.location.origin + '\n' +
+            'URL: ' + BOOTSTRAP_URL + '\n\n' +
+            'Salesforce UAT no está permitiendo este dominio. En F12 no verás nada útil si:\n' +
+            '- Abres F12 en Cursor en lugar de en Chrome/Edge sobre github.io\n' +
+            '- En Red el filtro no está en "Todo" (All)\n' +
+            '- No recargas la página CON F12 ya abierto\n\n' +
+            'Hay que autorizar https://sfigueroa12.github.io en Allowed Domains del deployment y en CORS de la org.';
+          console.error(detail);
+          setChatStatus('error', detail);
+        });
     }
   </script>
   <script type="text/javascript"
