@@ -4,15 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Enhanced Chat Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }
+    #chat-status {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      max-width: 52rem;
+      white-space: pre-wrap;
+    }
+    #chat-status.pending { background: #fff8e1; border: 1px solid #f9a825; }
+    #chat-status.ok { background: #e8f5e9; border: 1px solid #2e7d32; }
+    #chat-status.error { background: #fdecea; border: 1px solid #c62828; }
+  </style>
 </head>
 <body>
   <h1>Prueba Enhanced Chat</h1>
   <p>Si todo está bien configurado, verás el botón de chat en la esquina inferior.</p>
+  <div id="chat-status" class="pending">Cargando widget de Salesforce…</div>
 
-  <script type='text/javascript'>
+  <script type="text/javascript">
+    function setChatStatus(type, message) {
+      var box = document.getElementById('chat-status');
+      box.className = type;
+      box.textContent = message;
+    }
+
     function initEmbeddedMessaging() {
       try {
-        embeddedservice_bootstrap.settings.language = 'es'; // For example, enter 'en' or 'en-US'
+        if (typeof embeddedservice_bootstrap === 'undefined') {
+          setChatStatus(
+            'error',
+            'El archivo bootstrap.min.js se pidió, pero Salesforce no expuso embeddedservice_bootstrap.\n' +
+            'Suele ocurrir si el site Experience Cloud no es público o si este dominio no está autorizado.'
+          );
+          return;
+        }
+
+        embeddedservice_bootstrap.settings.language = 'es';
 
         embeddedservice_bootstrap.init(
           '00D3O0000008mtk',
@@ -22,12 +51,32 @@
             scrt2URL: 'https://cepsa--uat.sandbox.my.salesforce-scrt.com'
           }
         );
+
+        setChatStatus(
+          'ok',
+          'Init ejecutado desde ' + window.location.origin + '.\n' +
+          'Si no ves el botón flotante, este dominio no está en Allowed Domains / CORS de la org UAT.\n' +
+          'Añade exactamente: https://sfigueroa12.github.io'
+        );
       } catch (err) {
         console.error('Error loading Embedded Messaging: ', err);
+        setChatStatus('error', 'Error al inicializar Embedded Messaging:\n' + err);
       }
-    };
-  </script>
-  <script type='text/javascript' src='https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677/s/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
+    }
 
+    function onBootstrapLoadError() {
+      setChatStatus(
+        'error',
+        'No se pudo cargar bootstrap.min.js desde el site UAT de Cepsa.\n' +
+        'Origen de esta página: ' + window.location.origin + '\n\n' +
+        'Revisa en F12 > Red si bootstrap.min.js da 409, 403 o CORS.\n' +
+        'Hay que autorizar https://sfigueroa12.github.io en el Embedded Service Deployment y en CORS de la org.'
+      );
+    }
+  </script>
+  <script type="text/javascript"
+    src="https://cepsa--uat.sandbox.my.site.com/ESWFBchnEnhancedChatS1784625543677/s/assets/js/bootstrap.min.js"
+    onload="initEmbeddedMessaging()"
+    onerror="onBootstrapLoadError()"></script>
 </body>
 </html>
